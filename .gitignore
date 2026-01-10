@@ -57,3 +57,6 @@ lib/secrets.dart
 /aeroguard_agent/pubspec.lock
 /aeroguard_agent/.metadata
 /aeroguard_agent/.dart_tool/
+
+# Ignore any secrets.dart files anywhere in the tree
+secrets.dart
