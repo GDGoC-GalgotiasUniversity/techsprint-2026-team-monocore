@@ -1,0 +1,71 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Visual Studio Code
+.vscode/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+
+# Android
+android/local.properties
+android/.gradle
+android/app/build
+android/key.properties
+**/android/**/generated/
+
+# iOS
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+
+# CocoaPods
+ios/Pods/
+ios/.symlinks/
+
+# ----------------------------------------
+# 🔒 SECURITY (CRITICAL FOR HACKATHONS)
+# ----------------------------------------
+# Ignore the file containing your real API keys
+lib/secrets.dart
+
+# (Optional) If you have a keystore for signing
+*.keystore
+*.jks
+
+# Ignore local and build files inside aeroguard_agent (repo has .git initialized at parent)
+/aeroguard_agent/.idea/
+/aeroguard_agent/*.iml
+/aeroguard_agent/.vscode/
+/aeroguard_agent/local.properties
+/aeroguard_agent/.gradle/
+/aeroguard_agent/build/
+/aeroguard_agent/.flutter-plugins
+/aeroguard_agent/.flutter-plugins-dependencies
+/aeroguard_agent/.packages
+/aeroguard_agent/pubspec.lock
+/aeroguard_agent/.metadata
+/aeroguard_agent/.dart_tool/

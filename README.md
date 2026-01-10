@@ -4,7 +4,7 @@
 
 ### Team: MonoCore
 
-> _A one-sentence tagline or slogan for your project goes here._
+> _Your proactive AI Health Companion that turns invisible pollution data into actionable safety decisions._
 
 ---
 
@@ -18,50 +18,50 @@
 
 ## 🎯 Problem Statement
 
-_Describe the specific pain point or challenge here (Keep it under 3 lines)._
+_Standard weather apps are passive; they show high AQI numbers but offer no guidance on how to navigate them safely._
 
-- **Context:** [Why is this a problem?]
-- **Impact:** [Who suffers from this?]
+- **Context:** Users see "AQI 200" but don't know if they should run, commute, or stay indoors.
+- **Impact:** Commuters, athletes, and sensitive groups unknowingly expose themselves to toxic hotspots.
 
 ## 💡 Solution
 
-_Describe your approach and how it solves the problem._
+_AeroGuard replaces passive dashboards with an Agentic AI that thinks, plans, and protects._
 
-1.  **Key Point 1:** [Description]
-2.  **Key Point 2:** [Description]
-3.  **Key Point 3:** [Description]
+1.  **Agentic Intelligence:** A Gemini-powered agent that autonomously fetches live data to answer queries like "Is it safe to run?" with specific advice.
+2.  **Green Routing:** An innovative navigation engine that calculates and suggests "Cleaner Air Routes" alongside the standard fastest path.
+3.  **Visual Perception:** A real-time pollution heatmap overlay that makes invisible toxins visible on the map for better awareness.
 
 ---
 
 ## 🛠 Tech Stack
 
-| Category       | Technologies Used        |
-| :------------- | :----------------------- |
-| **Frontend**   | React, Tailwind, Vite    |
-| **Backend**    | Node.js, Express, Python |
-| **Database**   | MongoDB, PostgreSQL      |
-| **Tools/APIs** | Docker, OpenAI API, AWS  |
+| Category            | Technologies Used                                         |
+| :------------------ | :-------------------------------------------------------- |
+| **Frontend/Mobile** | Flutter (Dart), Google Maps SDK                           |
+| **AI & Logic**      | Google Gemini API (Flash Model with Function Calling)     |
+| **Data & APIs**     | Google Directions API, WAQI (World Air Quality Index) API |
+| **Infrastructure**  | Google Cloud Platform (GCP)                               |
 
 ---
 
 ## 📊 MVP Features
 
-- [x] **Feature 1:** [Brief description]
-- [x] **Feature 2:** [Brief description]
-- [ ] **Feature 3:** [Brief description - In Progress]
+- [x] **AI Safety Agent:** Context-aware chat interface providing health bullet points based on live location.
+- [x] **Green Routing:** Visual comparison of "Fastest" (Blue) vs "Cleaner" (Green) travel paths.
+- [x] **Pollution Heatmap:** Live tile overlay visualizing AQI intensity across the city.
+- [x] **Smart UX:** Dynamic card resizing, typewriter text effects, and automatic context switching (Map vs Chat).
 
 ---
 
 ## 🔗 Links & Demo
 
-- **🌐 Live Site:** [https://your-app.vercel.app](https://your-app.vercel.app)
+- **🌐 Live Site/APK:** [Insert Drive Link to APK if available, or remove this line]
 - **📂 GitHub Repo:** [Link to Repo]
-- **📹 Video Demo:** [Link to Video]
+- **📹 Video Demo:** [Insert YouTube/Drive Link Here]
 
 > **Testing Credentials**
 >
-> - **User:** `user@demo.com`
-> - **Pass:** `hack2026`
+> - _No login required. The app uses device location and API keys automatically._
 
 ---
 
