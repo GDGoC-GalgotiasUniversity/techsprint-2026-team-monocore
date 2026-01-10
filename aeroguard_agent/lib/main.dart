@@ -1,5 +1,4 @@
 // ignore_for_file: unused_import, unused_field, unused_local_variable
-//MAIN CODE FILE
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -42,14 +41,8 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  // ============================================================
-  // For Rounds, enabling and disabling features
-  // ============================================================
-  static const bool enableHeatmap =
-      true; // Set false for Round 1, true for Round 2
-  static const bool enableRouting =
-      true; // Set false for Round 1, true for Round 2
-  // ============================================================
+  static const bool enableHeatmap = true;
+  static const bool enableRouting = true;
 
   final Completer<GoogleMapController> _controller = Completer();
   final GeminiService _geminiService = GeminiService();
@@ -75,7 +68,6 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-    // MODULE CHECK: Only load heatmap if enabled for this round
     if (enableHeatmap) {
       _initializeHeatmap();
     }
@@ -106,7 +98,6 @@ class _MapScreenState extends State<MapScreen> {
           double? destLng,
           int? destAqi,
         ) async {
-          // MODULE CHECK: If routing is disabled in this round, ignore the data
           if (!enableRouting) return;
 
           int? currentAqi;
@@ -128,7 +119,7 @@ class _MapScreenState extends State<MapScreen> {
             _polylines.clear();
             _markers.clear();
 
-            // Auto-hide heatmap when routing (if heatmap is supported)
+            // Auto-hide heatmap when routing
             if (enableHeatmap) {
               _showHeatmap = false;
             }
@@ -414,7 +405,6 @@ class _MapScreenState extends State<MapScreen> {
               const SizedBox(width: 8),
             ],
 
-            // MODULE CHECK: Hide reset if routing is disabled (since reset is mostly for routes)
             if (enableRouting) ...[
               FloatingActionButton.small(
                 heroTag: "reset_btn",
@@ -640,12 +630,3 @@ class _FadeInTextState extends State<FadeInText>
     return FadeTransition(opacity: _opacity, child: widget.child);
   }
 }
-
-
-/* NOTES:
-THINGS NOT TO MESS WITH WITHOUT HELP:
-buildAgentCard: It's as dynamic as i could get it, any more changes and it breaks, it will become a mess
-WAQI Heatmap takes time to load, it's all dependant on network, no need to worry about it.
-Map animation is FINE, DONT change anything with the zoom controls.
-
-*Gemini flash has limit, isko only use in testing, for demo can use other models but only when in production. */

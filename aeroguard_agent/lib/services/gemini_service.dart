@@ -1,5 +1,3 @@
-//FILE TO HANDLE THE GEMINI SIDE | Model | Prompt | Response
-
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../secrets.dart';
@@ -15,8 +13,6 @@ class GeminiService {
   double? _currentLat;
   double? _currentLng;
 
-  // Callback to update the map with routes and destination AQI
-  // Signature: (routes, destLat, destLng, destAqi)
   Function(
     List<List<LatLng>> routes,
     double? destLat,
@@ -31,43 +27,41 @@ class GeminiService {
   }
 
   Future<void> init() async {
-    // Declare two tools Gemini can call: get AQI and plan a trip
     final aqiTool = FunctionDeclaration(
       'get_current_air_quality',
-      'Returns the real-time AQI. Call this immediately if the user asks about safety. No arguments required.',
+      'Returns real-time AQI. No arguments.',
       Schema(SchemaType.object, properties: {}),
     );
 
     final tripTool = FunctionDeclaration(
       'plan_trip_to_destination',
-      'Calculates a route to a destination and returns travel time/distance.',
+      'Calculates routes to a destination.',
       Schema(
         SchemaType.object,
         properties: {
           'destination_name': Schema(
             SchemaType.string,
-            description: "The name of the city or place to go to.",
+            description: "City or place name.",
           ),
         },
         requiredProperties: ['destination_name'],
       ),
     );
 
-    // Initialize the local Gemini model with my system instruction
     _model = GenerativeModel(
-      model: 'models/gemini-3-flash',
+      model: 'gemini-flash-latest',
       apiKey: Secrets.geminiApiKey,
       tools: [
         Tool(functionDeclarations: [aqiTool, tripTool]),
       ],
+      // UPDATED PROMPT: Forces comparison logic
       systemInstruction: Content.system(
-        'You are AeroGuard. You have the user\'s location internally. NEVER ask for it. '
-        '1. Safety Queries: Call `get_current_air_quality`. '
-        '   - Response MUST be: One summary sentence. Then exactly 3 short bullet points with emojis. '
+        'You are AeroGuard. You have location access. NEVER ask for it. '
+        '1. Safety Queries: Call `get_current_air_quality`. Response: Summary + 3 bullets. '
         '2. Trip Planning: Call `plan_trip_to_destination`. '
-        '   - If 2 routes are found: Compare them (Fastest vs Cleaner). '
-        '   - If ONLY 1 route is found: State that "The fastest route is also the only viable option right now." '
-        '3. Be concise.',
+        '   - IF 2 ROUTES FOUND: You MUST list both options with their duration. '
+        '     Example: "🔵 **Fastest:** 20 mins | 🟢 **Cleaner:** 24 mins (+4 mins). I recommend the Green route for better air." '
+        '   - IF 1 ROUTE FOUND: "Only one viable route exists right now: [Duration]."',
       ),
     );
 
@@ -83,103 +77,87 @@ class GeminiService {
         final call = functionCalls.first;
         Map<String, dynamic> toolResult = {};
 
-        // AQI tool: return current location AQI if we have coords
         if (call.name == 'get_current_air_quality') {
           if (_currentLat != null) {
-            try {
-              toolResult = await _waqiService.getAirQuality(
-                _currentLat!,
-                _currentLng!,
-              );
-            } catch (e) {
-              print("🔴 WAQI service error (current): $e");
-              toolResult = {'error': 'Failed to fetch current AQI'};
-            }
+            toolResult = await _waqiService.getAirQuality(
+              _currentLat!,
+              _currentLng!,
+            );
           } else {
-            toolResult = {'error': 'Location not found'};
+            toolResult = {'error': 'Location context missing'};
           }
-        }
-        // Trip planning: get directions, fetch dest AQI, and call back to UI
-        else if (call.name == 'plan_trip_to_destination') {
+        } else if (call.name == 'plan_trip_to_destination') {
           final dest = call.args['destination_name'] as String?;
-          print("🤖 Agent attempting to plan trip to: $dest");
 
           if (dest != null && _currentLat != null) {
-            try {
-              final routes = await _directionsService.getDirections(
-                LatLng(_currentLat!, _currentLng!),
-                dest,
+            final routes = await _directionsService.getDirections(
+              LatLng(_currentLat!, _currentLng!),
+              dest,
+            );
+
+            if (routes.isNotEmpty) {
+              double destLat = routes[0]['coordinates'].last.latitude;
+              double destLng = routes[0]['coordinates'].last.longitude;
+              final destAqiData = await _waqiService.getAirQuality(
+                destLat,
+                destLng,
               );
+              final int? destAqi = destAqiData['aqi'] is int
+                  ? destAqiData['aqi']
+                  : null;
 
-              if (routes.isNotEmpty) {
-                // destination coords from first route's last point
-                final firstCoords = routes[0]['coordinates'] as List<LatLng>;
-                final double destLat = firstCoords.last.latitude;
-                final double destLng = firstCoords.last.longitude;
-
-                // fetch destination AQI
-                int? destAqi;
-                try {
-                  final destAqiData = await _waqiService.getAirQuality(
-                    destLat,
-                    destLng,
-                  );
-                  if (destAqiData['aqi'] is int)
-                    destAqi = destAqiData['aqi'] as int;
-                } catch (e) {
-                  print("🔴 WAQI service error (destination): $e");
+              if (onRouteFound != null) {
+                List<List<LatLng>> routeCoords = [];
+                for (var r in routes) {
+                  routeCoords.add(r['coordinates'] as List<LatLng>);
                 }
-
-                // call UI callback with route coords and destination info
-                if (onRouteFound != null) {
-                  List<List<LatLng>> routeCoords = [];
-                  for (var r in routes) {
-                    routeCoords.add(
-                      List<LatLng>.from(r['coordinates'] as List),
-                    );
-                  }
-                  onRouteFound!(routeCoords, destLat, destLng, destAqi);
-                }
-
-                // return structured route summary to Gemini
-                toolResult = {
-                  'routes_found': routes.length,
-                  'destination_aqi': destAqi,
-                  'primary_route': {
-                    'summary': routes[0]['summary'],
-                    'duration': routes[0]['duration'],
-                    'distance': routes[0]['distance'],
-                    'tag': 'Fastest',
-                  },
-                  'alternative_route': routes.length > 1
-                      ? {
-                          'summary': routes[1]['summary'],
-                          'duration': routes[1]['duration'],
-                          'distance': routes[1]['distance'],
-                          'tag': 'Cleaner Air Choice',
-                        }
-                      : null,
-                };
+                onRouteFound!(routeCoords, destLat, destLng, destAqi);
               }
-            } catch (e) {
-              print("🔴 Directions service error: $e");
-              toolResult = {'error': 'Failed to get directions: $e'};
+
+              // CALCULATE DIFFERENCES MANUALLY FOR THE AGENT
+              String diffText = "";
+              if (routes.length > 1) {
+                int val1 = routes[0]['duration_value'];
+                int val2 = routes[1]['duration_value'];
+                int diffMinutes = ((val2 - val1) / 60).round();
+                diffText = "+$diffMinutes mins";
+              }
+
+              toolResult = {
+                'routes_found': routes.length,
+                'destination_aqi': destAqi,
+                'primary_route': {
+                  'summary': routes[0]['summary'],
+                  'duration': routes[0]['duration'],
+                  'distance': routes[0]['distance'],
+                  'tag': 'Fastest (Blue)',
+                },
+                'alternative_route': routes.length > 1
+                    ? {
+                        'summary': routes[1]['summary'],
+                        'duration': routes[1]['duration'],
+                        'distance': routes[1]['distance'],
+                        'time_difference':
+                            diffText, // Sending the calculated math
+                        'tag': 'Cleaner Option (Green)',
+                      }
+                    : null,
+              };
+            } else {
+              toolResult = {'error': 'No routes found via API.'};
             }
-          } else {
-            toolResult = {'error': 'Destination or current location missing.'};
           }
         }
 
-        // send the tool result back to Gemini
         response = await _chat.sendMessage(
           Content.functionResponse(call.name, toolResult),
         );
       }
 
-      return response.text ?? "I'm having trouble thinking.";
+      return response.text ?? "Analyzing routes...";
     } catch (e) {
-      print("🔴 Gemini/API Error: $e");
-      return "I encountered a technical error: $e";
+      print("Gemini Service Error: $e");
+      return "Connection error. Please try again.";
     }
   }
 }
