@@ -55,9 +55,9 @@ _AeroGuard replaces passive dashboards with an Agentic AI that thinks, plans, an
 
 ## 🔗 Links & Demo
 
-- **🌐 Live Site/APK:** [\Drive Link\]](https://drive.google.com/file/d/1OZUieUhHXyuMdQ7REqUx5P1J0EAi38BY/view?usp=sharing)
-- **📂 GitHub Repo:** [\[Repository\]](https://github.com/GDGoC-GalgotiasUniversity/techsprint-2026-team-monocore/tree/main)
-- **📹 Video Demo:** [\Drive Link\]](https://drive.google.com/file/d/1GmZcK8ZJ7xg1xoec4FIjnNo5Z8pN_Riu/view?usp=sharing)
+- **🌐 Live Site/APK:** [Drive Link](https://drive.google.com/file/d/1OZUieUhHXyuMdQ7REqUx5P1J0EAi38BY/view?usp=sharing)
+- **📂 GitHub Repo:** [Repository](https://github.com/GDGoC-GalgotiasUniversity/techsprint-2026-team-monocore/tree/main)
+- **📹 Video Demo:** [Drive Link](https://drive.google.com/file/d/1GmZcK8ZJ7xg1xoec4FIjnNo5Z8pN_Riu/view?usp=sharing)
 
 > **Testing Credentials**
 >
