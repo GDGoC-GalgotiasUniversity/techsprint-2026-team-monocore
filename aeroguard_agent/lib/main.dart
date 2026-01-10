@@ -1,6 +1,7 @@
 // ignore_for_file: unused_import, unused_field, unused_local_variable
 
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -10,7 +11,9 @@ import 'services/waqi_service.dart';
 import 'services/gemini_service.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 void main() {
   runApp(const AeroGuardApp());
@@ -80,7 +83,8 @@ class _MapScreenState extends State<MapScreen> {
     final TileOverlay tileOverlay = TileOverlay(
       tileOverlayId: TileOverlayId(overlayId),
       tileProvider: WaqiTileProvider(Secrets.waqiApiKey),
-      transparency: 0.4,
+      transparency: 0.2,
+      zIndex: 999,
     );
 
     setState(() {
@@ -572,26 +576,37 @@ class _MapScreenState extends State<MapScreen> {
   }
 }
 
+// ⚡ High-Performance Cached Provider
 class WaqiTileProvider implements TileProvider {
   final String apiKey;
+  // Use the default cache manager to store/retrieve files
+  final BaseCacheManager _cacheManager = DefaultCacheManager();
+
   WaqiTileProvider(this.apiKey);
 
   @override
   Future<Tile> getTile(int x, int y, int? zoom) async {
+    // 1. Zoom Clamp (Safety): WAQI only has tiles up to zoom ~15-16
+    // If we request a tile deeper than that, return transparent immediately to stop loading spinners
+    if (zoom == null || zoom > 16) return TileProvider.noTile;
+
     final url =
         "https://tiles.waqi.info/tiles/usepa-aqi/$zoom/$x/$y.png?token=$apiKey";
+
     try {
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {'User-Agent': 'AeroGuard/1.0 (Flutter)'},
+      // 2. The Magic: 'getSingleFile' checks cache first, then network
+      final File file = await _cacheManager.getSingleFile(
+        url,
+        headers: {'User-Agent': 'AeroGuard/1.0 (Flutter)'}, // Anti-blocking
       );
-      if (response.statusCode == 200) {
-        return Tile(256, 256, response.bodyBytes);
-      }
+
+      // 3. Return the bytes from the cached file
+      final Uint8List bytes = await file.readAsBytes();
+      return Tile(256, 256, bytes);
     } catch (e) {
-      print("Heatmap Error: $e");
+      // If network fails or tile missing, return transparent tile so map doesn't lag
+      return TileProvider.noTile;
     }
-    return TileProvider.noTile;
   }
 }
 
