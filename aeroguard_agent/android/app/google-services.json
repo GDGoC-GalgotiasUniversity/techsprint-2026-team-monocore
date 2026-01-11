@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "882704469654",
+    "project_id": "aeroguard-b75df",
+    "storage_bucket": "aeroguard-b75df.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:882704469654:android:e4c639446da176718a7cb7",
+        "android_client_info": {
+          "package_name": "com.example.aeroguard_agent"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAlozazolk95Q5zjjNhu_bPU7gYD3r5WTg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

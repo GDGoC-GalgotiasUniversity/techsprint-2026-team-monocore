@@ -3,6 +3,8 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -18,7 +20,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const AeroGuardApp());
 }
 
@@ -79,10 +83,12 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    // Real-time hazards listener (updates markers for everyone)
+    _listenToHazards();
+    // Keep local user data for points and persisted settings
     _loadUserData();
     if (enableHeatmap) {
       _initializeHeatmap();
-      _loadUserData();
     }
     _initializeSystem();
   }
@@ -115,23 +121,23 @@ class _MapScreenState extends State<MapScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text("Verify $type"),
-        content: const Text("Is this hazard still present at this location?"),
+        content: const Text("Is this hazard still present?"),
         actions: [
           TextButton(
-            onPressed: () {
-              setState(() {
-                // Remove from local memory
-                _hazardData.removeWhere((item) => item['id'] == id);
-                _reportMarkers.removeWhere((m) => m.markerId.value == id);
-              });
-              // Save changes to disk
-              _saveReports();
-              Navigator.pop(ctx);
+            onPressed: () async {
+              // DELETE FROM CLOUD
+              try {
+                await FirebaseFirestore.instance
+                    .collection('hazards')
+                    .doc(id)
+                    .delete();
+              } catch (e) {
+                // ignore errors
+              }
 
+              Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Thanks! Report marked as resolved."),
-                ),
+                const SnackBar(content: Text("Hazard cleared for everyone.")),
               );
             },
             child: const Text(
@@ -139,7 +145,6 @@ class _MapScreenState extends State<MapScreen> {
               style: TextStyle(color: Colors.red),
             ),
           ),
-
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
@@ -179,6 +184,41 @@ class _MapScreenState extends State<MapScreen> {
     final prefs = await SharedPreferences.getInstance();
     final String encoded = json.encode(_hazardData);
     await prefs.setString('hazard_reports', encoded);
+  }
+
+  // REAL-TIME LISTENER: Updates map whenever ANYONE reports a hazard
+  void _listenToHazards() {
+    FirebaseFirestore.instance
+        .collection('hazards')
+        .snapshots() // This stream gives us updates instantly
+        .listen((snapshot) {
+          setState(() {
+            _reportMarkers.clear(); // Clear old markers
+
+            for (var doc in snapshot.docs) {
+              final data = doc.data();
+              final String id = doc.id; // Firestore Document ID
+
+              final double lat = (data['lat'] as num).toDouble();
+              final double lng = (data['lng'] as num).toDouble();
+
+              // Create Marker from Firestore Data
+              final marker = Marker(
+                markerId: MarkerId(id),
+                position: LatLng(lat, lng),
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueOrange,
+                ),
+                onTap: () => _showVerifyDialog(
+                  id,
+                  (data['type'] ?? 'Hazard').toString(),
+                ),
+              );
+
+              _reportMarkers.add(marker);
+            }
+          });
+        });
   }
 
   Future<void> _handleReport() async {
@@ -330,40 +370,36 @@ class _MapScreenState extends State<MapScreen> {
   void _addHazardMarker(String type) {
     if (_currentPosition == null) return;
 
-    final String reportId = DateTime.now().millisecondsSinceEpoch.toString();
-
-    final newReport = {
-      'id': reportId,
+    // 1. Write to Firestore
+    FirebaseFirestore.instance.collection('hazards').add({
       'type': type,
       'lat': _currentPosition!.latitude,
       'lng': _currentPosition!.longitude,
-      'timestamp': DateTime.now().toIso8601String(),
-    };
-
-    setState(() {
-      _hazardData.add(newReport);
-      _createMarkerFromData(newReport);
-
-      // Add points for verified report
-      _userPoints += 10;
+      'timestamp': FieldValue.serverTimestamp(), // Use Server Time
+      'verified': true,
     });
 
-    _saveReports(); // Save markers
-    _savePoints(); // Save new score
+    // 2. Local Rewards (Keep this local for simplicity in MVP)
+    setState(() {
+      _userPoints += 10;
+    });
+    _savePoints();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.stars, color: Colors.amber),
+            const Icon(Icons.cloud_upload, color: Colors.white),
             const SizedBox(width: 10),
-            Text("Verified! +10 Points added (Total: $_userPoints)"),
+            Text("Report uploaded! +10 Points"),
           ],
         ),
         backgroundColor: Colors.teal,
-        behavior: SnackBarBehavior.floating,
       ),
     );
+
+    // Note: We DON'T need to manually add to _reportMarkers here.
+    // The _listenToHazards() function will see the new data and update the map automatically!
   }
 
   void _initializeHeatmap() {
