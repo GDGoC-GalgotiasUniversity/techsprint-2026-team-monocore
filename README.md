@@ -33,6 +33,8 @@ _AeroGuard replaces passive dashboards with an Agentic AI that thinks, plans, se
 3.  **Citizen Sentinel:** A community-driven layer where users report hazards (e.g., smoke), verified instantly by Gemini Vision to update the map for everyone.
 4.  **Visual Perception:** A real-time pollution heatmap overlay that makes invisible toxins visible on the map for better awareness.
 
+5.  **Gamification:** Inmplented a points system for every clean route and correctly marked hazard to user.
+
 ---
 
 ## 🛠 Tech Stack

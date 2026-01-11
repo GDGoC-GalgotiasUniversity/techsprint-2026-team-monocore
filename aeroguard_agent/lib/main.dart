@@ -47,6 +47,7 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
+  int _userPoints = 0;
   static const bool enableHeatmap = true;
   static const bool enableRouting = true;
   List<Map<String, dynamic>> _hazardData = [];
@@ -78,11 +79,17 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    _loadUserData();
     if (enableHeatmap) {
       _initializeHeatmap();
-      _loadSavedReports();
+      _loadUserData();
     }
     _initializeSystem();
+  }
+
+  Future<void> _savePoints() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('user_points', _userPoints);
   }
 
   void _createMarkerFromData(Map<String, dynamic> report) {
@@ -149,21 +156,26 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   // LOAD reports from disk on startup
-  Future<void> _loadSavedReports() async {
+  Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    final String? storedString = prefs.getString('hazard_reports');
 
-    if (storedString != null) {
-      final List<dynamic> decoded = json.decode(storedString);
+    // 1. Load Hazards
+    final String? storedReports = prefs.getString('hazard_reports');
+    if (storedReports != null) {
+      final List<dynamic> decoded = json.decode(storedReports);
       setState(() {
         _hazardData = decoded.cast<Map<String, dynamic>>();
-        // Rebuild markers from data
         _reportMarkers.clear();
         for (var report in _hazardData) {
           _createMarkerFromData(report);
         }
       });
     }
+
+    // 2. Load Points
+    setState(() {
+      _userPoints = prefs.getInt('user_points') ?? 0;
+    });
   }
 
   // SAVE current list to disk
@@ -325,7 +337,6 @@ class _MapScreenState extends State<MapScreen> {
 
     final String reportId = DateTime.now().millisecondsSinceEpoch.toString();
 
-    // 1. Create Data Object
     final newReport = {
       'id': reportId,
       'type': type,
@@ -335,23 +346,26 @@ class _MapScreenState extends State<MapScreen> {
     };
 
     setState(() {
-      // 2. Add to Data List
       _hazardData.add(newReport);
-
-      // 3. Create Visual Marker
       _createMarkerFromData(newReport);
+
+      // GAMIFICATION: Add Points!
+      _userPoints += 10;
     });
 
-    // 4. Persist to Disk
-    _saveReports();
+    _saveReports(); // Save markers
+    _savePoints(); // Save new score
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.white),
+            const Icon(
+              Icons.stars,
+              color: Colors.amber,
+            ), // Star icon for reward
             const SizedBox(width: 10),
-            Text("Verified: $type added to map."),
+            Text("Verified! +10 Points added (Total: $_userPoints)"),
           ],
         ),
         backgroundColor: Colors.teal,
@@ -499,7 +513,7 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  Future<void> _resetApp() async {
+  Future<void> _performReset({bool clearPoints = false}) async {
     setState(() {
       _polylines.clear();
       _markers.clear();
@@ -509,8 +523,15 @@ class _MapScreenState extends State<MapScreen> {
       _agentResponse =
           "I am monitoring the air quality around you. Had a change of mind on going out?";
       _isCardExpanded = true;
+
+      // RESET LOGIC
+      if (clearPoints) {
+        _userPoints = 0;
+        _savePoints(); // Clear from disk
+      }
     });
 
+    // Re-center map
     if (_currentPosition != null) {
       final controller = await _controller.future;
       controller.animateCamera(
@@ -538,6 +559,49 @@ class _MapScreenState extends State<MapScreen> {
       _agentResponse = response;
       _isAgentThinking = false;
     });
+  }
+
+  void _showResetDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Reset App"),
+        content: const Text(
+          "Do you want to clear your current session or reset everything including your earned points?",
+        ),
+        actions: [
+          // OPTION 1: Just Map
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _performReset(clearPoints: false);
+            },
+            child: const Text(
+              "Clear Map Only",
+              style: TextStyle(color: Colors.teal),
+            ),
+          ),
+
+          // OPTION 2: Full Reset
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _performReset(clearPoints: true);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("App fully reset (Points cleared)."),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text(
+              "Full Factory Reset",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   LatLngBounds _boundsFromLatLngList(List<LatLng> list) {
@@ -629,58 +693,103 @@ class _MapScreenState extends State<MapScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start, // Align to top
           children: [
-            // LEFT SIDE: Compact Status Card
+            // LEFT SIDE: Stacked Cards (Status + Points)
             Flexible(
-              child: Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ), // Slightly tighter padding
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Existing Status Card
+                  Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.cloud_outlined, color: Colors.teal),
+                          if (_startAqi != null) ...[
+                            const SizedBox(width: 10),
+                            Container(
+                              width: 1,
+                              height: 20,
+                              color: Colors.grey.shade300,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              "AQI $_startAqi",
+                              style: TextStyle(
+                                color: _getColorForAqi(_startAqi!),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.cloud_outlined, color: Colors.teal),
 
-                      // REMOVED: The "AeroGuard" text widget is gone.
-                      if (_startAqi != null) ...[
-                        const SizedBox(width: 10),
-                        // Divider
-                        Container(
-                          width: 1,
-                          height: 20,
-                          color: Colors.grey.shade300,
+                  // 2. NEW GAMIFICATION BADGE
+                  if (_userPoints > 0) ...[
+                    const SizedBox(height: 6), // Tiny gap
+                    Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
                         ),
-                        const SizedBox(width: 10),
-                        // AQI Text
-                        Text(
-                          "AQI $_startAqi",
-                          style: TextStyle(
-                            color: _getColorForAqi(_startAqi!),
-                            fontWeight: FontWeight.bold,
-                          ),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade100,
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                      ],
-                    ],
-                  ),
-                ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.stars,
+                              size: 16,
+                              color: Colors.deepOrange,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              "$_userPoints Pts",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: Colors.deepOrange,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
 
             const SizedBox(width: 8),
 
-            // RIGHT SIDE: Buttons (Same as before)
+            // RIGHT SIDE: Buttons (Unchanged)
             Row(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (enableHeatmap) ...[
                   FloatingActionButton.small(
@@ -709,7 +818,7 @@ class _MapScreenState extends State<MapScreen> {
                     heroTag: "reset_btn",
                     backgroundColor: Colors.white,
                     child: const Icon(Icons.refresh, color: Colors.black54),
-                    onPressed: _resetApp,
+                    onPressed: _showResetDialog, // Changed to call dialog
                   ),
                 ],
               ],
