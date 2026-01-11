@@ -10,9 +10,9 @@
 
 ## 👥 Team Details
 
-| Name          | Role      | Email              |
-| :------------ | :-------- | :----------------- |
-| **Mohd Aafi** | Team Lead | mdaafi04@gmail.com |
+| Name           | Role       | Email               |
+| :------------- | :--------- | :------------------ |
+| **Mohd Aafi**  | Team Lead  | mdaafi04@gmail.com  |
 
 ---
 
@@ -22,25 +22,27 @@ _Standard weather apps are passive; they show high AQI numbers but offer no guid
 
 - **Context:** Users see "AQI 200" but don't know if they should run, commute, or stay indoors.
 - **Impact:** Commuters, athletes, and sensitive groups unknowingly expose themselves to toxic hotspots.
+- **Gap:** Official sensors are sparse, often missing hyper-local hazards like garbage fires or construction dust.
 
 ## 💡 Solution
 
-_AeroGuard replaces passive dashboards with an Agentic AI that thinks, plans, and protects._
+_AeroGuard replaces passive dashboards with an Agentic AI that thinks, plans, sees, and protects._
 
 1.  **Agentic Intelligence:** A Gemini-powered agent that autonomously fetches live data to answer queries like "Is it safe to run?" with specific advice.
 2.  **Green Routing:** An innovative navigation engine that calculates and suggests "Cleaner Air Routes" alongside the standard fastest path.
-3.  **Visual Perception:** A real-time pollution heatmap overlay that makes invisible toxins visible on the map for better awareness.
+3.  **Citizen Sentinel:** A community-driven layer where users report hazards (e.g., smoke), verified instantly by Gemini Vision to update the map for everyone.
+4.  **Visual Perception:** A real-time pollution heatmap overlay that makes invisible toxins visible on the map for better awareness.
 
 ---
 
 ## 🛠 Tech Stack
 
-| Category            | Technologies Used                                         |
-| :------------------ | :-------------------------------------------------------- |
-| **Frontend/Mobile** | Flutter (Dart), Google Maps SDK                           |
-| **AI & Logic**      | Google Gemini API (Flash Model with Function Calling)     |
-| **Data & APIs**     | Google Directions API, WAQI (World Air Quality Index) API |
-| **Infrastructure**  | Google Cloud Platform (GCP)                               |
+| Category             | Technologies Used                                         |
+| :------------------- | :-------------------------------------------------------- |
+| **Frontend/Mobile**  | Flutter (Dart), Google Maps SDK                           |
+| **AI & Logic**       | Google Gemini API (Flash Model + Vision capabilities)     |
+| **Data & APIs**      | Google Directions, WAQI API, Shared Preferences           |
+| **Infrastructure**   | Google Cloud Platform (GCP)                               |
 
 ---
 
@@ -48,8 +50,9 @@ _AeroGuard replaces passive dashboards with an Agentic AI that thinks, plans, an
 
 - [x] **AI Safety Agent:** Context-aware chat interface providing health bullet points based on live location.
 - [x] **Green Routing:** Visual comparison of "Fastest" (Blue) vs "Cleaner" (Green) travel paths.
+- [x] **Citizen Sentinel:** Crowdsourced hazard reporting (e.g., fires) verified by AI Vision with persistent markers.
 - [x] **Pollution Heatmap:** Live tile overlay visualizing AQI intensity across the city.
-- [x] **Smart UX:** Dynamic card resizing, typewriter text effects, and automatic context switching (Map vs Chat).
+- [x] **Smart UX:** Dynamic card resizing, typewriter text effects, and automatic context switching.
 
 ---
 
