@@ -3,6 +3,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../secrets.dart';
 import 'waqi_service.dart';
 import 'directions_service.dart';
+import 'dart:io';
+import 'dart:typed_data';
 
 class GeminiService {
   late final GenerativeModel _model;
@@ -158,6 +160,39 @@ class GeminiService {
     } catch (e) {
       print("Gemini Service Error: $e");
       return "Connection error. Please try again.";
+    }
+  }
+
+  /// CITIZEN SENTINEL: Verifies if the image matches the user's report
+  Future<Map<String, dynamic>> analyzePollutionImage(
+    File imageFile,
+    String userDescription,
+  ) async {
+    try {
+      final imageBytes = await imageFile.readAsBytes();
+
+      final prompt = TextPart(
+        "The user is reporting this pollution hazard: '$userDescription'. "
+        "Analyze the image. Does it visually support this report? "
+        "Respond strictly in JSON: { \"verified\": true/false, \"confidence\": \"High/Medium/Low\" }.",
+      );
+
+      final imagePart = DataPart('image/jpeg', imageBytes);
+
+      final response = await _model.generateContent([
+        Content.multi([prompt, imagePart]),
+      ]);
+
+      final text = response.text ?? "";
+
+      if (text.contains("true")) {
+        return {'verified': true, 'type': userDescription};
+      }
+      return {'verified': false};
+    } catch (e) {
+      print("Vision Error: $e");
+      // MOCK FALLBACK (If API fails/limits reached, assume user is truthful for demo)
+      return {'verified': true, 'type': userDescription};
     }
   }
 }

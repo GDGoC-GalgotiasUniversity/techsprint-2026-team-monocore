@@ -14,6 +14,9 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 void main() {
   runApp(const AeroGuardApp());
@@ -46,10 +49,13 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   static const bool enableHeatmap = true;
   static const bool enableRouting = true;
+  List<Map<String, dynamic>> _hazardData = [];
 
   final Completer<GoogleMapController> _controller = Completer();
   final GeminiService _geminiService = GeminiService();
   final TextEditingController _textController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+  final Set<Marker> _reportMarkers = {};
 
   static const LatLng _initialPosition = LatLng(28.3639, 77.5360);
   LatLng? _currentPosition;
@@ -59,6 +65,7 @@ class _MapScreenState extends State<MapScreen> {
   final Set<TileOverlay> _tileOverlays = {};
   bool _isCardExpanded = true;
   bool _showHeatmap = true;
+  bool _isVerifyingReport = false;
 
   bool _isLoading = true;
   bool _isAgentThinking = false;
@@ -73,8 +80,284 @@ class _MapScreenState extends State<MapScreen> {
     super.initState();
     if (enableHeatmap) {
       _initializeHeatmap();
+      _loadSavedReports();
     }
     _initializeSystem();
+  }
+
+  void _createMarkerFromData(Map<String, dynamic> report) {
+    final String id = report['id'];
+    final LatLng position = LatLng(report['lat'], report['lng']);
+    final String type = report['type'];
+
+    final marker = Marker(
+      markerId: MarkerId(id),
+      position: position,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+      // Instead of just an info window, we verify on tap
+      onTap: () {
+        _showVerifyDialog(id, type);
+      },
+    );
+
+    _reportMarkers.add(marker);
+  }
+
+  void _showVerifyDialog(String id, String type) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("Verify $type"),
+        content: const Text("Is this hazard still present at this location?"),
+        actions: [
+          // "NO" BUTTON -> REMOVES THE REPORT
+          TextButton(
+            onPressed: () {
+              setState(() {
+                // 1. Remove from local memory
+                _hazardData.removeWhere((item) => item['id'] == id);
+                _reportMarkers.removeWhere((m) => m.markerId.value == id);
+              });
+              // 2. Save changes to disk
+              _saveReports();
+              Navigator.pop(ctx);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Thanks! Report marked as resolved."),
+                ),
+              );
+            },
+            child: const Text(
+              "No (Clear It)",
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+
+          // "YES" BUTTON -> KEEPS IT
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+            child: const Text(
+              "Yes (Still Here)",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // LOAD reports from disk on startup
+  Future<void> _loadSavedReports() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? storedString = prefs.getString('hazard_reports');
+
+    if (storedString != null) {
+      final List<dynamic> decoded = json.decode(storedString);
+      setState(() {
+        _hazardData = decoded.cast<Map<String, dynamic>>();
+        // Rebuild markers from data
+        _reportMarkers.clear();
+        for (var report in _hazardData) {
+          _createMarkerFromData(report);
+        }
+      });
+    }
+  }
+
+  // SAVE current list to disk
+  Future<void> _saveReports() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String encoded = json.encode(_hazardData);
+    await prefs.setString('hazard_reports', encoded);
+  }
+
+  // CITIZEN SENTINEL: New Flow
+  Future<void> _handleReport() async {
+    // 1. Pick Image
+    final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
+    if (photo == null) return;
+
+    // 2. Open the Input Dialog immediately (No full screen loading!)
+    if (mounted) {
+      _showReportDialog(File(photo.path));
+    }
+  }
+
+  void _showReportDialog(File imageFile) {
+    final TextEditingController reportController = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: const [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                  SizedBox(width: 10),
+                  Text("Report Hazard"),
+                ],
+              ),
+              // FIX A: Wrap content in SingleChildScrollView to prevent overflow
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        imageFile,
+                        height: 150,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+
+                    TextField(
+                      controller: reportController,
+                      enabled: !_isVerifyingReport,
+                      decoration: InputDecoration(
+                        hintText: "What do you see? (e.g. Smoke)",
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+
+                    if (_isVerifyingReport) ...[
+                      const SizedBox(height: 20),
+                      const LinearProgressIndicator(
+                        color: Colors.teal,
+                        backgroundColor: Colors.black12,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Agent is verifying evidence...",
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                if (!_isVerifyingReport)
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      "Cancel",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isVerifyingReport
+                        ? Colors.grey
+                        : Colors.teal,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  onPressed: _isVerifyingReport
+                      ? null
+                      : () async {
+                          if (reportController.text.isEmpty) return;
+
+                          // FIX B: Dismiss Keyboard INSTANTLY to free up screen space
+                          FocusScope.of(context).unfocus();
+
+                          setDialogState(() {
+                            _isVerifyingReport = true;
+                          });
+
+                          // Artificial delay for demo
+                          await Future.delayed(const Duration(seconds: 2));
+
+                          final result = await _geminiService
+                              .analyzePollutionImage(
+                                imageFile,
+                                reportController.text,
+                              );
+
+                          if (mounted) {
+                            Navigator.pop(context);
+                            setState(() {
+                              _isVerifyingReport = false;
+                            });
+
+                            if (result['verified'] == true) {
+                              _addHazardMarker(result['type']);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    "❌ Agent could not verify the hazard.",
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  child: const Text("Verify & Report"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _addHazardMarker(String type) {
+    if (_currentPosition == null) return;
+
+    final String reportId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    // 1. Create Data Object
+    final newReport = {
+      'id': reportId,
+      'type': type,
+      'lat': _currentPosition!.latitude,
+      'lng': _currentPosition!.longitude,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+
+    setState(() {
+      // 2. Add to Data List
+      _hazardData.add(newReport);
+
+      // 3. Create Visual Marker
+      _createMarkerFromData(newReport);
+    });
+
+    // 4. Persist to Disk
+    _saveReports();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 10),
+            Text("Verified: $type added to map."),
+          ],
+        ),
+        backgroundColor: Colors.teal,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _initializeHeatmap() {
@@ -289,7 +572,7 @@ class _MapScreenState extends State<MapScreen> {
               zoom: 12,
             ),
             polylines: _polylines,
-            markers: _markers,
+            markers: _markers.union(_reportMarkers),
             // MODULE CHECK: Only show tiles if feature enabled
             tileOverlays: (enableHeatmap && _showHeatmap) ? _tileOverlays : {},
             myLocationEnabled: true,
@@ -345,78 +628,92 @@ class _MapScreenState extends State<MapScreen> {
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
+            // LEFT SIDE: Compact Status Card
+            Flexible(
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.cloud_outlined, color: Colors.teal),
-                    const SizedBox(width: 8),
-                    const Text(
-                      "AeroGuard",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    if (_startAqi != null) ...[
-                      const SizedBox(width: 10),
-                      Container(
-                        width: 1,
-                        height: 20,
-                        color: Colors.grey.shade300,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        "AQI $_startAqi",
-                        style: TextStyle(
-                          color: _getColorForAqi(_startAqi!),
-                          fontWeight: FontWeight.bold,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ), // Slightly tighter padding
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.cloud_outlined, color: Colors.teal),
+
+                      // REMOVED: The "AeroGuard" text widget is gone.
+                      if (_startAqi != null) ...[
+                        const SizedBox(width: 10),
+                        // Divider
+                        Container(
+                          width: 1,
+                          height: 20,
+                          color: Colors.grey.shade300,
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        // AQI Text
+                        Text(
+                          "AQI $_startAqi",
+                          style: TextStyle(
+                            color: _getColorForAqi(_startAqi!),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
-            const Spacer(),
 
-            // MODULE CHECK: Hide toggle if heatmap is disabled
-            if (enableHeatmap) ...[
-              FloatingActionButton.small(
-                heroTag: "heatmap_toggle",
-                backgroundColor: _showHeatmap ? Colors.teal : Colors.white,
-                child: Icon(
-                  Icons.layers,
-                  color: _showHeatmap ? Colors.white : Colors.black54,
+            const SizedBox(width: 8),
+
+            // RIGHT SIDE: Buttons (Same as before)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (enableHeatmap) ...[
+                  FloatingActionButton.small(
+                    heroTag: "heatmap_toggle",
+                    backgroundColor: _showHeatmap ? Colors.teal : Colors.white,
+                    child: Icon(
+                      Icons.layers,
+                      color: _showHeatmap ? Colors.white : Colors.black54,
+                    ),
+                    onPressed: () =>
+                        setState(() => _showHeatmap = !_showHeatmap),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+
+                FloatingActionButton.small(
+                  heroTag: "report_btn",
+                  backgroundColor: Colors.orange,
+                  child: const Icon(Icons.camera_alt, color: Colors.white),
+                  onPressed: _handleReport,
                 ),
-                onPressed: () {
-                  setState(() {
-                    _showHeatmap = !_showHeatmap;
-                  });
-                },
-              ),
-              const SizedBox(width: 8),
-            ],
 
-            if (enableRouting) ...[
-              FloatingActionButton.small(
-                heroTag: "reset_btn",
-                backgroundColor: Colors.white,
-                child: const Icon(Icons.refresh, color: Colors.black54),
-                onPressed: _resetApp,
-              ),
-            ],
+                if (enableRouting) ...[
+                  const SizedBox(width: 8),
+                  FloatingActionButton.small(
+                    heroTag: "reset_btn",
+                    backgroundColor: Colors.white,
+                    child: const Icon(Icons.refresh, color: Colors.black54),
+                    onPressed: _resetApp,
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
       ),
