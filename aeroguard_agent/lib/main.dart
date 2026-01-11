@@ -101,7 +101,7 @@ class _MapScreenState extends State<MapScreen> {
       markerId: MarkerId(id),
       position: position,
       icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-      // Instead of just an info window, we verify on tap
+      // Verify report when marker is tapped
       onTap: () {
         _showVerifyDialog(id, type);
       },
@@ -117,15 +117,14 @@ class _MapScreenState extends State<MapScreen> {
         title: Text("Verify $type"),
         content: const Text("Is this hazard still present at this location?"),
         actions: [
-          // "NO" BUTTON -> REMOVES THE REPORT
           TextButton(
             onPressed: () {
               setState(() {
-                // 1. Remove from local memory
+                // Remove from local memory
                 _hazardData.removeWhere((item) => item['id'] == id);
                 _reportMarkers.removeWhere((m) => m.markerId.value == id);
               });
-              // 2. Save changes to disk
+              // Save changes to disk
               _saveReports();
               Navigator.pop(ctx);
 
@@ -141,7 +140,6 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
 
-          // "YES" BUTTON -> KEEPS IT
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
@@ -155,11 +153,10 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // LOAD reports from disk on startup
+  // Load reports from disk on startup
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // 1. Load Hazards
     final String? storedReports = prefs.getString('hazard_reports');
     if (storedReports != null) {
       final List<dynamic> decoded = json.decode(storedReports);
@@ -172,26 +169,24 @@ class _MapScreenState extends State<MapScreen> {
       });
     }
 
-    // 2. Load Points
     setState(() {
       _userPoints = prefs.getInt('user_points') ?? 0;
     });
   }
 
-  // SAVE current list to disk
+  // Save current list to disk
   Future<void> _saveReports() async {
     final prefs = await SharedPreferences.getInstance();
     final String encoded = json.encode(_hazardData);
     await prefs.setString('hazard_reports', encoded);
   }
 
-  // CITIZEN SENTINEL: New Flow
   Future<void> _handleReport() async {
-    // 1. Pick Image
+    // Pick image from camera
     final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
     if (photo == null) return;
 
-    // 2. Open the Input Dialog immediately (No full screen loading!)
+    // Open a dialog to get report details
     if (mounted) {
       _showReportDialog(File(photo.path));
     }
@@ -217,7 +212,7 @@ class _MapScreenState extends State<MapScreen> {
                   Text("Report Hazard"),
                 ],
               ),
-              // FIX A: Wrap content in SingleChildScrollView to prevent overflow
+              // Wrap content in SingleChildScrollView to prevent overflow
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -287,14 +282,14 @@ class _MapScreenState extends State<MapScreen> {
                       : () async {
                           if (reportController.text.isEmpty) return;
 
-                          // FIX B: Dismiss Keyboard INSTANTLY to free up screen space
+                          // Dismiss keyboard to free up screen space
                           FocusScope.of(context).unfocus();
 
                           setDialogState(() {
                             _isVerifyingReport = true;
                           });
 
-                          // Artificial delay for demo
+                          // Demo delay
                           await Future.delayed(const Duration(seconds: 2));
 
                           final result = await _geminiService
@@ -349,7 +344,7 @@ class _MapScreenState extends State<MapScreen> {
       _hazardData.add(newReport);
       _createMarkerFromData(newReport);
 
-      // GAMIFICATION: Add Points!
+      // Add points for verified report
       _userPoints += 10;
     });
 
@@ -360,10 +355,7 @@ class _MapScreenState extends State<MapScreen> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(
-              Icons.stars,
-              color: Colors.amber,
-            ), // Star icon for reward
+            const Icon(Icons.stars, color: Colors.amber),
             const SizedBox(width: 10),
             Text("Verified! +10 Points added (Total: $_userPoints)"),
           ],
@@ -524,7 +516,7 @@ class _MapScreenState extends State<MapScreen> {
           "I am monitoring the air quality around you. Had a change of mind on going out?";
       _isCardExpanded = true;
 
-      // RESET LOGIC
+      // Reset logic
       if (clearPoints) {
         _userPoints = 0;
         _savePoints(); // Clear from disk
@@ -570,7 +562,6 @@ class _MapScreenState extends State<MapScreen> {
           "Do you want to clear your current session or reset everything including your earned points?",
         ),
         actions: [
-          // OPTION 1: Just Map
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -582,7 +573,6 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
 
-          // OPTION 2: Full Reset
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -637,7 +627,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
             polylines: _polylines,
             markers: _markers.union(_reportMarkers),
-            // MODULE CHECK: Only show tiles if feature enabled
+            // Only show heatmap tiles if feature enabled
             tileOverlays: (enableHeatmap && _showHeatmap) ? _tileOverlays : {},
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
@@ -695,13 +685,13 @@ class _MapScreenState extends State<MapScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start, // Align to top
           children: [
-            // LEFT SIDE: Stacked Cards (Status + Points)
+            // Left: status and points
             Flexible(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. Existing Status Card
+                  // Status card
                   Card(
                     elevation: 4,
                     shape: RoundedRectangleBorder(
@@ -741,7 +731,7 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ),
 
-                  // 2. NEW GAMIFICATION BADGE
+                  // Gamification badge
                   if (_userPoints > 0) ...[
                     const SizedBox(height: 6), // Tiny gap
                     Card(
@@ -786,7 +776,7 @@ class _MapScreenState extends State<MapScreen> {
 
             const SizedBox(width: 8),
 
-            // RIGHT SIDE: Buttons (Unchanged)
+            // Right: action buttons
             Row(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -912,7 +902,7 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                     ),
 
-                  // MODULE CHECK: Only show trip stats if Routing is enabled
+                  // Only show trip stats if routing is enabled
                   if (enableRouting &&
                       _destAqi != null &&
                       !_isAgentThinking) ...[
@@ -982,7 +972,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 }
 
-// ⚡ High-Performance Cached Provider
+// WaqiTileProvider: cached tile provider
 class WaqiTileProvider implements TileProvider {
   final String apiKey;
   // Use the default cache manager to store/retrieve files
@@ -992,25 +982,24 @@ class WaqiTileProvider implements TileProvider {
 
   @override
   Future<Tile> getTile(int x, int y, int? zoom) async {
-    // 1. Zoom Clamp (Safety): WAQI only has tiles up to zoom ~15-16
-    // If we request a tile deeper than that, return transparent immediately to stop loading spinners
+    // Zoom clamp: WAQI provides tiles up to ~zoom 15-16
+    // Return noTile for higher zooms to avoid unnecessary requests
     if (zoom == null || zoom > 16) return TileProvider.noTile;
 
     final url =
         "https://tiles.waqi.info/tiles/usepa-aqi/$zoom/$x/$y.png?token=$apiKey";
 
     try {
-      // 2. The Magic: 'getSingleFile' checks cache first, then network
+      // getSingleFile checks the cache first, then falls back to network
       final File file = await _cacheManager.getSingleFile(
         url,
-        headers: {'User-Agent': 'AeroGuard/1.0 (Flutter)'}, // Anti-blocking
+        headers: {'User-Agent': 'AeroGuard/1.0 (Flutter)'},
       );
 
-      // 3. Return the bytes from the cached file
       final Uint8List bytes = await file.readAsBytes();
       return Tile(256, 256, bytes);
     } catch (e) {
-      // If network fails or tile missing, return transparent tile so map doesn't lag
+      // On failure, return no tile to avoid map lag
       return TileProvider.noTile;
     }
   }
