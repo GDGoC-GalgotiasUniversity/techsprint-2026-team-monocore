@@ -35,8 +35,6 @@ _AeroGuard replaces passive dashboards with an Agentic AI that thinks, plans, se
 
 5.  **Gamification:** Inmplented a points system for every clean route and correctly marked hazard to user.
 
-6.  **Firebase:** Inmplented backend to update hazards for all users
-
 ---
 
 ## 🛠 Tech Stack
@@ -47,6 +45,7 @@ _AeroGuard replaces passive dashboards with an Agentic AI that thinks, plans, se
 | **AI & Logic**       | Google Gemini API (Flash Model + Vision capabilities)     |
 | **Data & APIs**      | Google Directions, WAQI API, Shared Preferences           |
 | **Infrastructure**   | Google Cloud Platform (GCP)                               |
+| **Backend **         | Firebase                                                  |
 
 ---
 
