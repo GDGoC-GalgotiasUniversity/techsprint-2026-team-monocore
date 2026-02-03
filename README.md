@@ -45,7 +45,7 @@ _AeroGuard replaces passive dashboards with an Agentic AI that thinks, plans, se
 | **AI & Logic**       | Google Gemini API (Flash Model + Vision capabilities)     |
 | **Data & APIs**      | Google Directions, WAQI API, Shared Preferences           |
 | **Infrastructure**   | Google Cloud Platform (GCP)                               |
-| **Backend **         | Firebase                                                  |
+| **Backend**          | Firebase                                                  |
 
 ---
 
@@ -61,9 +61,9 @@ _AeroGuard replaces passive dashboards with an Agentic AI that thinks, plans, se
 
 ## 🔗 Links & Demo
 
-- **🌐 Live Site/APK:** [APK Drive Link](https://drive.google.com/file/d/1OZUieUhHXyuMdQ7REqUx5P1J0EAi38BY/view?usp=sharing)
+- **🌐 Live Site/APK:** [APK Drive Link](https://drive.google.com/file/d/1yr3eHYq9U26_Q6cb9ZxkJCFONdRRtHY-/view?usp=sharing)
 - **📂 GitHub Repo:** [Repository](https://github.com/GDGoC-GalgotiasUniversity/techsprint-2026-team-monocore/tree/main)
-- **📹 Video Demo:** [Drive Link](https://drive.google.com/file/d/1GmZcK8ZJ7xg1xoec4FIjnNo5Z8pN_Riu/view?usp=sharing)
+- **📹 Video Demo:** [Drive Link](https://drive.google.com/file/d/1kSvdVkF35DZv3vA420dbLh7XT5TjdcFA/view?usp=sharing)
 
 > **Testing Credentials**
 >
